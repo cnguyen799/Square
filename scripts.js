@@ -35,10 +35,12 @@ const ENEMY_COUNT = 3; // Starting enemies
 
 // Function to spawn a new enemy
 function spawnEnemy() {
+    if (enemies.length >= 10) return; // Limit to 10 enemies on screen
+
     const enemyType = Math.random(); // Random number to determine enemy type
     let enemy;
 
-    if (enemyType < 0.33) {
+    if (enemyType < 0.25) {
         enemy = {
             x: Math.random() * (canvas.width - 30),
             y: Math.random() * (canvas.height - 30),
@@ -49,44 +51,83 @@ function spawnEnemy() {
             currentHp: 100,
             canShoot: false // Circle enemies do not shoot
         };
-    } else if (enemyType < 0.66) {
+    } else if (enemyType < 0.5) {
         enemy = {
             x: Math.random() * (canvas.width - 30),
             y: Math.random() * (canvas.height - 30),
-            size: 30,
-            speed: 1.5,
+            size: 50,
+            speed: 1,
             color: '#3498db', // Square color (blue)
             damage: 10,
             currentHp: 150,
-            canShoot: true, // Square enemies can shoot
-            shootInterval: 500, // Shoot every half second
-            lastShotTime: 0 // Track last shot time
+            canShoot: false // Square enemies do not shoot
         };
-    } else {
+    } else if (enemyType < 0.75) {
         enemy = {
             x: Math.random() * (canvas.width - 30),
             y: Math.random() * (canvas.height - 30),
-            radius: 10,
-            speed: 1,
-            color: '#00ff00', // Triangle color (green)
-            damage: 5,
-            currentHp: 50,
-            canShoot: true // Triangle enemies can shoot
+            radius: 20,
+            speed: 3, // Fast
+            color: '#000000', // Pitch black
+            damage: 15,
+            currentHp: 200,
+            canShoot: true, // Warden can shoot
+            shootInterval: 1000, // Shoot every second
+            lastShotTime: 0 // Track last shot time
+        };
+    } else {
+        // New Warden Monster
+        enemy = {
+            x: Math.random() * (canvas.width - 30),
+            y: Math.random() * (canvas.height - 30),
+            radius: 20,
+            speed: 3, // Fast
+            color: '#000000', // Pitch black
+            damage: 15,
+            currentHp: 200,
+            canShoot: true, // Can shoot
+            shootInterval: 1000, // Shoot every second
+            lastShotTime: 0 // Track last shot time
         };
     }
     enemies.push(enemy);
 }
 
-// Initialize enemies
-for (let i = 0; i < ENEMY_COUNT; i++) {
-    spawnEnemy();
+// Function to draw enemies
+function drawEnemies() {
+    enemies.forEach(enemy => {
+        if (enemy.radius) {
+            ctx.fillStyle = enemy.color;
+            // Draw circular enemy
+            ctx.beginPath();
+            ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (enemy.size) {
+            ctx.fillStyle = enemy.color;
+            // Draw square enemy
+            ctx.fillRect(enemy.x, enemy.y, enemy.size, enemy.size);
+        }
+    });
 }
+
+// Initialize enemies
+function initializeEnemies() {
+    for (let i = 0; i < ENEMY_COUNT; i++) {
+        spawnEnemy(); // Spawn new enemies
+    }
+}
+
+// Call initializeEnemies when the game starts
+initializeEnemies();
 
 // Bullet properties
 const bullets = [];
 const BULLET_SPEED = 10;
 const BULLET_DAMAGE = 50;
 const BULLET_RADIUS = 5;
+
+// Projectile array to store projectiles
+let projectiles = [];
 
 // Movement state
 const movement = {
@@ -258,19 +299,41 @@ function updateEnemies() {
         enemy.y += moveY * enemy.speed;
 
         // Keep enemies within canvas bounds
-        enemy.x = Math.max(enemy.radius, Math.min(canvas.width - enemy.radius, enemy.x));
-        enemy.y = Math.max(enemy.radius, Math.min(canvas.height - enemy.radius, enemy.y));
+        if (enemy.radius) {
+            enemy.x = Math.max(enemy.radius, Math.min(canvas.width - enemy.radius, enemy.x));
+            enemy.y = Math.max(enemy.radius, Math.min(canvas.height - enemy.radius, enemy.y));
+        } else if (enemy.size) {
+            enemy.x = Math.max(0, Math.min(canvas.width - enemy.size, enemy.x));
+            enemy.y = Math.max(0, Math.min(canvas.height - enemy.size, enemy.y));
+        }
 
         // Check collision with hero
-        if (!hero.isInvulnerable && checkCollisionCircle(hero, enemy)) {
-            hero.currentHp -= enemy.damage;
-            if (hero.currentHp < 0) hero.currentHp = 0;
-            
-            // Activate invulnerability
-            hero.isInvulnerable = true;
-            setTimeout(() => {
-                hero.isInvulnerable = false; // Reset invulnerability after 0.5 seconds
-            }, 500);
+        if (!hero.isInvulnerable && enemy.radius) {
+            if (checkCollisionCircle(hero, enemy)) {
+                hero.currentHp -= enemy.damage;
+                if (hero.currentHp < 0) hero.currentHp = 0;
+                
+                // Activate invulnerability
+                hero.isInvulnerable = true;
+                setTimeout(() => {
+                    hero.isInvulnerable = false; // Reset invulnerability after 0.5 seconds
+                }, 500);
+            }
+        } else if (!hero.isInvulnerable && enemy.size) {
+            const dx = hero.x + hero.size / 2 - enemy.x - enemy.size / 2;
+            const dy = hero.y + hero.size / 2 - enemy.y - enemy.size / 2;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const minDistance = hero.size / 2 + enemy.size / 2;
+            if (distance < minDistance) {
+                hero.currentHp -= enemy.damage;
+                if (hero.currentHp < 0) hero.currentHp = 0;
+                
+                // Activate invulnerability
+                hero.isInvulnerable = true;
+                setTimeout(() => {
+                    hero.isInvulnerable = false; // Reset invulnerability after 0.5 seconds
+                }, 500);
+            }
         }
 
         // Shooting logic for square enemies
@@ -281,7 +344,64 @@ function updateEnemies() {
                 enemy.lastShotTime = currentTime; // Update last shot time
             }
         }
+
+        // Shooting logic for warden enemies
+        if (enemy.canShoot && enemy.radius === 20) {
+            updateWarden(enemy);
+        }
     });
+}
+
+// Update warden's shooting logic
+function updateWarden(warden) {
+    const currentTime = Date.now();
+    if (currentTime - warden.lastShotTime >= warden.shootInterval) {
+        // Create a new projectile
+        const projectile = {
+            x: warden.x,
+            y: warden.y,
+            radius: BULLET_RADIUS,
+            speed: 5,
+            damage: 10,
+            direction: {
+                x: (hero.x - warden.x) / Math.sqrt((hero.x - warden.x) ** 2 + (hero.y - warden.y) ** 2),
+                y: (hero.y - warden.y) / Math.sqrt((hero.x - warden.x) ** 2 + (hero.y - warden.y) ** 2)
+            }
+        };
+        projectiles.push(projectile);
+        warden.lastShotTime = currentTime; // Update last shot time
+        console.log(`Warden shot a projectile!`);
+    }
+}
+
+// Function to update projectiles
+function updateProjectiles() {
+    for (let i = projectiles.length - 1; i >= 0; i--) {
+        const projectile = projectiles[i];
+        projectile.x += projectile.speed * projectile.direction.x;
+        projectile.y += projectile.speed * projectile.direction.y;
+
+        // Check if projectile is out of bounds
+        if (projectile.x < 0 || projectile.x > canvas.width || projectile.y < 0 || projectile.y > canvas.height) {
+            projectiles.splice(i, 1); // Remove projectile if out of bounds
+            continue;
+        }
+
+        // Check collision with hero
+        if (checkCollision(projectile, hero)) {
+            hero.currentHp -= projectile.damage;
+            projectiles.splice(i, 1); // Remove projectile on hit
+            console.log(`Hero hit! Remaining HP: ${hero.currentHp}`);
+        }
+    }
+}
+
+// Function to check collision between two objects
+function checkCollision(obj1, obj2) {
+    const dx = obj1.x - obj2.x;
+    const dy = obj1.y - obj2.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    return distance < (obj1.radius + obj2.size / 2); // Assuming hero is a square
 }
 
 // Update bullets
@@ -304,18 +424,42 @@ function updateBullets() {
             const dy = bullet.y - enemy.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
 
-            if (distance < bullet.radius + enemy.radius) {
+            if (enemy.radius && distance < bullet.radius + enemy.radius) {
                 // Bullet hit the enemy
                 enemy.currentHp -= bullet.damage;
                 bullets.splice(i, 1); // Remove bullet
+                console.log(`Enemy hit! Remaining HP: ${enemy.currentHp}`);
                 if (enemy.currentHp <= 0) {
+                    console.log(`Enemy killed!`);
                     enemies.splice(j, 1); // Remove enemy if dead
-                    // Spawn new enemies after half a second
-                    for (let k = 0; k < 2; k++) { // Spawn 2 new enemies
-                        setTimeout(() => {
-                            spawnEnemy(); // Chance to spawn any enemy type
-                        }, 500);
-                    }
+                    // Delay before spawning new enemies
+                    setTimeout(() => {
+                        for (let k = 0; k < 3; k++) { // Attempt to spawn 3 new enemies
+                            if (enemies.length < 10) {
+                                spawnEnemy(); // Spawn new enemy
+                                console.log(`Spawned new enemy! Current count: ${enemies.length}`);
+                            }
+                        }
+                    }, 2000); // Delay of 2000ms (2 seconds)
+                }
+                break;
+            } else if (enemy.size && dx > 0 && dx < enemy.size && dy > 0 && dy < enemy.size) {
+                // Bullet hit the square enemy
+                enemy.currentHp -= bullet.damage;
+                bullets.splice(i, 1); // Remove bullet
+                console.log(`Square enemy hit! Remaining HP: ${enemy.currentHp}`);
+                if (enemy.currentHp <= 0) {
+                    console.log(`Square enemy killed!`);
+                    enemies.splice(j, 1); // Remove enemy if dead
+                    // Delay before spawning new enemies
+                    setTimeout(() => {
+                        for (let k = 0; k < 3; k++) { // Attempt to spawn 3 new enemies
+                            if (enemies.length < 10) {
+                                spawnEnemy(); // Spawn new enemy
+                                console.log(`Spawned new enemy! Current count: ${enemies.length}`);
+                            }
+                        }
+                    }, 2000); // Delay of 2000ms (2 seconds)
                 }
                 break;
             }
@@ -347,36 +491,22 @@ function drawHero() {
     ctx.fillRect(hpBarX, hpBarY, currentWidth, hero.hpBarHeight);
 }
 
-// Draw enemies
-function drawEnemies() {
-    enemies.forEach(enemy => {
-        ctx.fillStyle = enemy.color;
-        if (enemy.size) {
-            // Draw square enemy
-            ctx.fillRect(enemy.x, enemy.y, enemy.size, enemy.size);
-        } else if (enemy.radius) {
-            // Draw circular enemy
-            ctx.beginPath();
-            ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
-            ctx.fill();
-        } else if (enemy.canShoot) {
-            // Draw triangle enemy
-            ctx.beginPath();
-            ctx.moveTo(enemy.x, enemy.y - enemy.radius);
-            ctx.lineTo(enemy.x - enemy.radius, enemy.y + enemy.radius);
-            ctx.lineTo(enemy.x + enemy.radius, enemy.y + enemy.radius);
-            ctx.closePath();
-            ctx.fill();
-        }
-    });
-}
-
 // Draw bullets
 function drawBullets() {
     bullets.forEach(bullet => {
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
         ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
+        ctx.fill();
+    });
+}
+
+// Draw projectiles
+function drawProjectiles() {
+    projectiles.forEach(projectile => {
+        ctx.fillStyle = '#ff0000';
+        ctx.beginPath();
+        ctx.arc(projectile.x, projectile.y, projectile.radius, 0, Math.PI * 2);
         ctx.fill();
     });
 }
@@ -393,10 +523,8 @@ function updateTimer() {
         lastUpdateTime = currentTime; // Update last update time
 
         // Check timer for spawning new enemies
-        if (timer === 10) {
+        if (timer % 5 === 0) {
             spawnEnemy(); // Summon square enemy
-        } else if (timer === 20) {
-            spawnEnemy(); // Summon triangle enemy
         }
     }
 }
@@ -412,6 +540,7 @@ function gameLoop() {
         drawEnemies();
         drawHero();
         drawBullets(); // Draw bullets
+        drawProjectiles(); // Draw projectiles
         
         // Draw a semi-transparent overlay
         ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // 50% opacity
@@ -428,12 +557,14 @@ function gameLoop() {
     updateHero();
     updateEnemies();
     updateBullets(); // Update bullets
+    updateProjectiles(); // Update projectiles
     updateTimer(); // Update timer
     
     // Draw everything
     drawEnemies();
     drawHero();
     drawBullets(); // Draw bullets
+    drawProjectiles(); // Draw projectiles
     
     // Draw timer
     ctx.fillStyle = '#ffffff'; // Set timer color to white
