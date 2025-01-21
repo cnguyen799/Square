@@ -44,7 +44,7 @@ function spawnEnemy() {
             y: Math.random() * (canvas.height - 30),
             radius: 15,
             speed: 2,
-            color: '#e74c3c',
+            color: '#e74c3c', // Circle color
             damage: 10,
             currentHp: 100,
             canShoot: false // Circle enemies do not shoot
@@ -55,7 +55,7 @@ function spawnEnemy() {
             y: Math.random() * (canvas.height - 30),
             size: 30,
             speed: 1.5,
-            color: '#3498db',
+            color: '#3498db', // Square color (blue)
             damage: 10,
             currentHp: 150,
             canShoot: true, // Square enemies can shoot
@@ -68,7 +68,7 @@ function spawnEnemy() {
             y: Math.random() * (canvas.height - 30),
             radius: 10,
             speed: 1,
-            color: '#f39c12',
+            color: '#00ff00', // Triangle color (green)
             damage: 5,
             currentHp: 50,
             canShoot: true // Triangle enemies can shoot
@@ -358,6 +358,14 @@ function drawEnemies() {
             // Draw circular enemy
             ctx.beginPath();
             ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (enemy.canShoot) {
+            // Draw triangle enemy
+            ctx.beginPath();
+            ctx.moveTo(enemy.x, enemy.y - enemy.radius);
+            ctx.lineTo(enemy.x - enemy.radius, enemy.y + enemy.radius);
+            ctx.lineTo(enemy.x + enemy.radius, enemy.y + enemy.radius);
+            ctx.closePath();
             ctx.fill();
         }
     });
